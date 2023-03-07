@@ -77,9 +77,10 @@ def gpt3_5_completion(prompt, engine, temp, top_p, tokens, freq_pen, pres_pen, s
             text = re.sub('[\r\n]+', '\n', text)
             text = re.sub('[\t ]+', ' ', text)
             filename = '%s_gpt3.txt' % time()
-            if not os.path.exists(config['raven']['gpt_log_dir']):
-                os.makedirs(config['raven']['gpt_log_dir'])
-            save_file('gpt3_logs/%s' % filename, prompt + '\n\n==========\n\n' + text)
+            foldername = config['raven']['gpt_log_dir']
+            if not os.path.exists(foldername):
+                os.makedirs(foldername)
+            save_file('%s/%s' % (foldername,filename), prompt + '\n\n==========\n\n' + text)
             return text
         except Exception as oops:
             retry += 1
@@ -108,9 +109,10 @@ def gpt3_completion(prompt, engine, temp, top_p, tokens, freq_pen, pres_pen, sto
             text = re.sub('[\r\n]+', '\n', text)
             text = re.sub('[\t ]+', ' ', text)
             filename = '%s_gpt3.txt' % time()
-            if not os.path.exists(config['raven']['gpt_log_dir']):
-                os.makedirs(config['raven']['gpt_log_dir'])
-            save_file('gpt3_logs/%s' % filename, prompt + '\n\n==========\n\n' + text)
+            foldername = config['raven']['gpt_log_dir']
+            if not os.path.exists(foldername):
+                os.makedirs(foldername)
+            save_file('%s/%s' % (foldername,filename), prompt + '\n\n==========\n\n' + text)
             return text
         except Exception as oops:
             retry += 1
@@ -135,19 +137,13 @@ def summarize_memories(memories):  # summarize a block of memories into one payl
     chunked_summary = ''
     blocks = chunk_memories(memories)
     block_count = len(blocks)
-    # print(blocks)
-    # print(len(blocks))
-    # breakpoint()
     for chunks in blocks:
-        # breakpoint('chunks in blocks')
         for chunk in chunks:
-            # breakpoint('chunk in chunks')
             chunked_message = ''
             for mem in chunk:
                 message = format_summary_memory(mem)
                 chunked_message += message + '\n\n'
             chunked_message = chunked_message.strip()
-            # print(chunked_message)
             chunked_prompt = open_file('prompt_notes.txt').replace('<<INPUT>>', chunked_summary + chunked_message)
             chunk_prompt_filename = 'summary_chunk_prompt_%s.json' % time()
             save_json('summary_prompts/%s' % chunk_prompt_filename, chunked_prompt)
@@ -213,18 +209,15 @@ def chunk_memories(memories, token_response_limit=int(config['raven']['summary_t
     blocking_done = False
     while not blocking_done:
         chunking_done = False
-        # chunks.clear()
         ## TODO: Come back to this decision of doubling the token response limit for each block
+        ## Initial reasoning behind this, a summary of summaries for the chunks would be created
+        ## then a summary of the next block, so we would need double the response space for each block.
         block_token_response_limit = (2 * block_count * token_response_limit)
         remaining_chunk_tokens = max_token_input - block_token_response_limit
-        # print(block_token_response_limit)
-        # print(remaining_chunk_tokens)
-        # breakpoint()
         while not chunking_done:
             chunk_length = 0
             chunk.clear()
             memories_this_chunk = 0
-            breakpoint('Starting a new chunk...')
             for i in range(current_memory_index, memory_count):
                 iter += 1
                 mem = memories[i]
@@ -238,83 +231,32 @@ def chunk_memories(memories, token_response_limit=int(config['raven']['summary_t
                     block_count += 1
                     blocks.append(chunks.copy())
                     chunking_done = True
-                    # print(iter)
-                    # print(i)
-                    # print(current_memory_index)
-                    # print(memory_count)
-                    # print(mem['uuid'])
-                    # print(message)
-                    # print(blocks)
-                    breakpoint('Chunking cannot continue, new block will be created...')
+                    breakpoint('\n\nChunking cannot continue until a new block is created...\n\n')
                     break
                 elif chunk_length > remaining_chunk_tokens:
                     current_memory_index = i
                     #### Chunking can continue, new chunk will be created
                     remaining_chunk_tokens -= token_response_limit
-                    # breakpoint('\n\n\nNew chunk about to be created. Here is current chunk...\n\n\n')
-                    # print(chunk)
-                    # breakpoint('\n\n\nHere is current chunks container...\n\n\n')
-                    # print(chunks)
-                    # breakpoint('\n\n\nAppending chunk to chunks container...\n\n\n')
                     chunks.append(chunk.copy())
-                    # breakpoint('\n\n\nhere is new chunks container...\n\n\n')
-                    # print(chunks)
-                    # breakpoint('\n\n\nMoving on...\n\n\n')
                     chunking_done = True
-                    # print(iter)
-                    # print(i)
-                    # print(current_memory_index)
-                    # print(memory_count)
-                    # print(mem['uuid'])
-                    # print(message)
-                    # print(chunks)
-                    breakpoint('Chunking can continue, new chunk will be created...')
                     break
                 elif i == memory_count-1:
                     #### End of process, append remaining chunk and add chunks to block
                     chunk.append(mem)
-                    # breakpoint('\n\n\nEnd of process. Here is current chunk...\n\n\n')
-                    # print(chunk)
-                    # breakpoint('\n\n\nHere is current chunks container...\n\n\n')
-                    # print(chunks)
-                    # breakpoint('\n\n\nAppending chunk to chunks container...\n\n\n')
                     chunks.append(chunk.copy())
-                    # breakpoint('\n\n\nhere is new chunks container...\n\n\n')
-                    # print(chunks)
-                    # breakpoint('\n\n\nWrapping up...\n\n\n')
-                    # breakpoint()
-                    # chunks.reverse()
                     blocks.append(chunks.copy())
                     chunking_done = True
                     blocking_done = True
-                    # print(iter)
-                    # print(i)
-                    # print(current_memory_index)
-                    # print(memory_count)
-                    # print(mem['uuid'])
-                    # print(message)
-                    # print(blocks)
-                    breakpoint('End of process, append remaining chunk and add chunks to block...')
                 else:
                     #### Chunking continues, decrement remaining tokens
                     chunk.append(mem)
                     memories_this_chunk += 1
-                    # print(iter)
-                    # print(i)
-                    # print(current_memory_index)
-                    # print(memory_count)
-                    # print(mem['uuid'])
-                    # print(message)
-                    # print(chunk_length)
-                    # print(remaining_chunk_tokens)
-                    # breakpoint('Chunking continues, decrement remaining tokens...')
                     continue
                 
                 if iter >= max_iter:
                     chunking_done = True
                     blocking_done = True
-                    # print('Chunking process hit maximum iterations!')
-    # blocks.reverse()
+                    breakpoint('\n\nSomething went wrong with the memory chunker. Max iterations reached.\n\n')
     return blocks
 
 
@@ -360,7 +302,6 @@ if __name__ == '__main__':
         payload, vector = prompt_user(payload)
         #### Search for relevant messages, and generate a response
         results = vdb.query(vector=vector, top_k=convo_length)
-        # print_pinecone_results(results)
         
         #### Load past conversations which match the user prompt and summarize
         conversation, recalled = load_conversation(results)
